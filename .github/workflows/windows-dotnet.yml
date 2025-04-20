@@ -63,3 +63,26 @@ jobs:
         #   Write-Error "Code coverage is below the required 80% threshold."
         #   exit 1
         # }
+
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+
+    - name: Build code
+      run: msbuild WindowsApp.sln /p:Configuration=Release
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
