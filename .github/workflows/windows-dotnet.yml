@@ -78,3 +78,11 @@ jobs:
     # Upload CodeQL results to GitHub
     - name: Upload CodeQL results to GitHub
       uses: github/codeql-action/upload-results@v2  # Corrected action reference
+
+    - name: Run unit tests with coverage and generate report
+      run: |
+        $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
+        $resultsDir = "TestResults"
+        mkdir $resultsDir
+        vstest.console.exe $testDll.FullName /EnableCodeCoverage /Logger:trx /ResultsDirectory:$resultsDir
+
