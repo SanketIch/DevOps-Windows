@@ -34,7 +34,7 @@ jobs:
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
         $resultsDir = "TestResults"
         mkdir $resultsDir
-        vstest.console.exe $testDll.FullName /EnableCodeCoverage /Logger:trx /ResultsDirectory:$resultsDir
+        vstest.console.exe $testDll.FullName /Settings:coveragerunsettings.runsettings /Logger:trx /ResultsDirectory:$resultsDir /EnableCodeCoverage
 
     - name: Upload test report artifact
       uses: actions/upload-artifact@v4
