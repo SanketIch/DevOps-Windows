@@ -1,4 +1,4 @@
-name: .NET Build, Test and Report
+name: .NET Build, Test, Report, Code Coverage, and Code Analysis
 
 on:
   push:
@@ -11,24 +11,31 @@ jobs:
     runs-on: windows-latest
 
     steps:
+    # Checkout code
     - name: Checkout code
       uses: actions/checkout@v4
 
+    # Setup NuGet
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v1
 
+    # Restore NuGet packages
     - name: Restore NuGet packages
       run: nuget restore WindowsApp.sln
 
+    # Setup MSBuild
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v1.3.1
 
+    # Build solution
     - name: Build solution
       run: msbuild WindowsApp.sln /p:Configuration=Release
 
+    # Install VSTest Console
     - name: Install VSTest Console
       uses: darenm/Setup-VSTest@v1
 
+    # Run unit tests and generate report
     - name: Run unit tests and generate report
       run: |
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
@@ -36,8 +43,38 @@ jobs:
         mkdir $resultsDir
         vstest.console.exe $testDll.FullName /Logger:trx /ResultsDirectory:$resultsDir
 
+    # Upload test report artifact
     - name: Upload test report artifact
       uses: actions/upload-artifact@v4
       with:
         name: TestResults
         path: TestResults/*.trx
+
+    # Install Coverlet for code coverage
+    - name: Install Coverlet
+      run: dotnet tool install --global coverlet.console
+
+    # Run tests with code coverage
+    - name: Run tests with code coverage
+      run: |
+        dotnet test WindowsApp.sln --collect:"XPlat Code Coverage" --results-directory ./TestResults
+
+    # Upload code coverage results (Codecov example)
+    - name: Upload code coverage results
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./TestResults/coverage.cobertura.xml  # Adjust based on your coverage output format
+
+    # Set up CodeQL for static analysis
+    - name: Set up CodeQL
+      uses: github/codeql-action/setup@v2
+      with:
+        languages: 'csharp'
+
+    # Run CodeQL analysis
+    - name: Analyze with CodeQL
+      uses: github/codeql-action/analyze@v2
+
+    # Upload CodeQL results to GitHub
+    - name: Upload CodeQL results to GitHub
+      uses: github/codeql-action/upload-results@v2
