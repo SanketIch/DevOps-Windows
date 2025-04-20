@@ -29,21 +29,36 @@ jobs:
     - name: Install VSTest Console
       uses: darenm/Setup-VSTest@v1
 
-    - name: Run unit tests with coverage and generate report
+    - name: Install ReportGenerator
+      run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+    - name: Run unit tests and generate coverage report
       run: |
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
+        $coverageFile = "Coverage.cobertura.xml"
         $resultsDir = "TestResults"
         mkdir $resultsDir
-        vstest.console.exe $testDll.FullName /Settings:coveragerunsettings.runsettings /Logger:trx /ResultsDirectory:$resultsDir /EnableCodeCoverage
-
+        vstest.console.exe $testDll.FullName /Collect:"Code Coverage" /EnableCodeCoverage /Logger:trx /ResultsDirectory:$resultsDir
+        reportgenerator -reports:$resultsDir/*.trx -targetdir:CoverageReport -reporttypes:Cobertura
+        Rename-Item "CoverageReport/Cobertura.xml" $coverageFile
     - name: Upload test report artifact
       uses: actions/upload-artifact@v4
       with:
         name: TestResults
         path: TestResults/*.trx
 
-    - name: Upload code coverage artifact
+    - name: Upload coverage report artifact
       uses: actions/upload-artifact@v4
       with:
-        name: CodeCoverage
-        path: TestResults/*.coverage
+        name: CoverageReport
+        path: Coverage.cobertura.xml
+
+    - name: Check code coverage
+      run: |
+        [xml]$coverageXml = Get-Content -Path "Coverage.cobertura.xml"
+        $coveredLines = $coverageXml.coverage.'line-rate' * 100
+        Write-Host "Code Coverage: $coveredLines%"
+        if ($coveredLines -lt 80) {
+          Write-Error "Code coverage is below the required 80% threshold."
+          exit 1
+        }
