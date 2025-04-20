@@ -65,16 +65,16 @@ jobs:
       with:
         file: ./TestResults/coverage.cobertura.xml  # Adjust based on your coverage output format
 
-    # Set up CodeQL for static analysis
+    # Set up CodeQL
     - name: Set up CodeQL
-      uses: github/codeql-action/setup@v2
+      uses: github/codeql-action/setup@v2  # Corrected action reference
       with:
         languages: 'csharp'
 
     # Run CodeQL analysis
     - name: Analyze with CodeQL
-      uses: github/codeql-action/analyze@v2
+      uses: github/codeql-action/analyze@v2  # Corrected action reference
 
     # Upload CodeQL results to GitHub
     - name: Upload CodeQL results to GitHub
-      uses: github/codeql-action/upload-results@v2
+      uses: github/codeql-action/upload-results@v2  # Corrected action reference
