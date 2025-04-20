@@ -37,10 +37,12 @@ jobs:
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
         $coverageFile = "Coverage.cobertura.xml"
         $resultsDir = "TestResults"
+        $coverageReportDir = "CoverageReport"
         mkdir $resultsDir
+        mkdir $coverageReportDir
         vstest.console.exe $testDll.FullName /Collect:"Code Coverage" /EnableCodeCoverage /Logger:trx /ResultsDirectory:$resultsDir
-        reportgenerator -reports:$resultsDir/*.trx -targetdir:CoverageReport -reporttypes:Cobertura
-        Rename-Item "CoverageReport/Cobertura.xml" $coverageFile
+        reportgenerator -reports:$resultsDir/*.trx -targetdir:$coverageReportDir -reporttypes:Cobertura
+        Rename-Item "$coverageReportDir/Cobertura.xml" $coverageFile
     - name: Upload test report artifact
       uses: actions/upload-artifact@v4
       with:
