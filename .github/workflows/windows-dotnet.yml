@@ -42,7 +42,7 @@ jobs:
         name: TestResults
         path: TestResults/*.trx
 
-    - name: Upload coverage artifact
+    - name: Upload code coverage artifact
       uses: actions/upload-artifact@v4
       with:
         name: CodeCoverage
