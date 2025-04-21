@@ -39,7 +39,7 @@ jobs:
         $resultsDir = "TestResults"
         mkdir $resultsDir
         vstest.console.exe $testDll.FullName /Collect:"Code Coverage" /EnableCodeCoverage /Logger:trx /ResultsDirectory:$resultsDir
-        reportgenerator -reports:$resultsDir/*.trx -targetdir:. -reporttypes:Cobertura;Html
+        reportgenerator "-reports:$resultsDir/*.trx" "-targetdir:." "-reporttypes:Cobertura;Html"
         Rename-Item "Cobertura.xml" $coverageFile
         Rename-Item "report-html" "CoverageReportHtml" # Rename the HTML report directory
 
