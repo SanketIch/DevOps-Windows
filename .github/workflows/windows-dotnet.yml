@@ -37,11 +37,11 @@ jobs:
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
         $coverageFile = "Coverage.cobertura.xml"
         $resultsDir = "TestResults"
+        $htmlReportDir = "CoverageReportHtml" # Define the desired HTML report directory name
         mkdir $resultsDir
-        vstest.console.exe $testDll.FullName /Collect:"Code Coverage" /EnableCodeCoverage /Logger:trx /ResultsDirectory:$resultsDir
-        reportgenerator "-reports:$resultsDir/*.trx" "-targetdir:." "-reporttypes:Cobertura;Html"
+        reportgenerator "-reports:$resultsDir/*.trx" "-targetdir:." "-reporttypes:Cobertura;Html" "-htmldir:$htmlReportDir"
         Rename-Item "Cobertura.xml" $coverageFile
-        Rename-Item "report-html" "CoverageReportHtml" # Rename the HTML report directory
+        # No need to rename "report-html" anymore as we are controlling the output directory
 
     - name: Upload test report artifact
       uses: actions/upload-artifact@v4
