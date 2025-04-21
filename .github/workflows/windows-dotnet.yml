@@ -35,13 +35,20 @@ jobs:
     - name: Run unit tests and generate coverage report
       run: |
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
-        $coverageFile = "Coverage.cobertura.xml"
         $resultsDir = "TestResults"
-        $htmlReportDir = "CoverageReportHtml" # Define the desired HTML report directory name
+        $coverageDir = "CoverageReport"
         mkdir $resultsDir
-        reportgenerator "-reports:$resultsDir/*.trx" "-targetdir:." "-reporttypes:Cobertura;Html" "-htmldir:$htmlReportDir"
-        Rename-Item "Cobertura.xml" $coverageFile
-        # No need to rename "report-html" anymore as we are controlling the output directory
+        mkdir $coverageDir
+        vstest.console.exe $testDll.FullName /Collect:"Code Coverage" /EnableCodeCoverage /Logger:trx /ResultsDirectory:$resultsDir
+    
+        $coverageFile = Get-ChildItem -Recurse -Filter "*.coverage" | Select-Object -First 1
+        if ($coverageFile) {
+          reportgenerator -reports:$coverageFile.FullName -targetdir:$coverageDir -reporttypes:HtmlInline_AzurePipelines;Cobertura
+        } else {
+          Write-Error "No coverage file found."
+          exit 1
+        }
+
 
     - name: Upload test report artifact
       uses: actions/upload-artifact@v4
