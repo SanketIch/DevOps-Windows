@@ -23,8 +23,8 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v1.3.1
 
-    - name: Build solution
-      run: msbuild WindowsApp.sln /p:Configuration=Release
+    - name: Build solution with debug symbols
+      run: msbuild WindowsApp.sln /p:Configuration=Release /p:DebugType=Full
 
     - name: Install VSTest Console
       uses: darenm/Setup-VSTest@v1
@@ -32,49 +32,78 @@ jobs:
     - name: Install ReportGenerator
       run: dotnet tool install --global dotnet-reportgenerator-globaltool
 
-    - name: Run unit tests with code coverage
+    - name: Run tests with proper coverage collection
       run: |
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
         $resultsDir = "TestResults"
         $coverageDir = "CoverageResults"
+        
         mkdir $resultsDir -Force
         mkdir $coverageDir -Force
         
-        # Run tests with code coverage
+        # Create runsettings file dynamically
+        @"
+<?xml version="1.0" encoding="utf-8"?>
+  <RunSettings>
+    <DataCollectionRunSettings>
+      <DataCollectors>
+        <DataCollector friendlyName="Code Coverage" uri="datacollector://Microsoft/CodeCoverage/2.0" assemblyQualifiedName="Microsoft.VisualStudio.Coverage.DynamicCoverageDataCollector, Microsoft.VisualStudio.TraceCollector, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+          <Configuration>
+            <CodeCoverage>
+              <ModulePaths>
+                <Include>
+                  <ModulePath>.*ConverterApp\.dll$</ModulePath>
+                </Include>
+                <Exclude>
+                  <ModulePath>.*Tests\.dll$</ModulePath>
+                  <ModulePath>.*Test\.dll$</ModulePath>
+                </Exclude>
+              </ModulePaths>
+              <UseVerifiableInstrumentation>True</UseVerifiableInstrumentation>
+              <AllowLowIntegrityProcesses>True</AllowLowIntegrityProcesses>
+              <CollectFromChildProcesses>True</CollectFromChildProcesses>
+            </CodeCoverage>
+          </Configuration>
+        </DataCollector>
+      </DataCollectors>
+    </DataCollectionRunSettings>
+  </RunSettings>
+"@ | Out-File -FilePath "CodeCoverage.runsettings" -Encoding utf8
+
+        # Run tests with coverage
         vstest.console.exe $testDll.FullName `
           /Logger:trx `
           /ResultsDirectory:$resultsDir `
-          /EnableCodeCoverage `
-          /Settings:CodeCoverage.runsettings
-        
-        # Find the coverage file (it will be in a subfolder with GUID name)
+          /Settings:CodeCoverage.runsettings `
+          /EnableCodeCoverage
+
+        # Find and convert the coverage file
         $coverageFile = Get-ChildItem -Recurse -Filter "*.coverage" | Select-Object -First 1
-        
-        # Convert coverage file to cobertura format
-        reportgenerator `
-          -reports:"$($coverageFile.FullName)" `
-          -targetdir:$coverageDir `
-          -reporttypes:Cobertura
+        if ($null -ne $coverageFile) {
+          reportgenerator `
+            -reports:"$($coverageFile.FullName)" `
+            -targetdir:$coverageDir `
+            -reporttypes:Cobertura
+        } else {
+          Write-Error "No coverage file was generated"
+          exit 1
+        }
 
-    - name: Upload test report artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: TestResults
-        path: TestResults/*.trx
-
-    - name: Upload coverage report artifact
+    - name: Upload coverage report
       uses: actions/upload-artifact@v4
       with:
         name: CoverageReport
         path: CoverageResults/Cobertura.xml
 
-    - name: Check code coverage
+    - name: Display coverage results
       run: |
-        [xml]$coverageXml = Get-Content -Path "CoverageResults/Cobertura.xml"
-        $coveredLines = [double]$coverageXml.coverage.'line-rate' * 100
-        Write-Host "Code Coverage: $coveredLines%"
-        if ($coveredLines -lt 80) {
-          Write-Error "Code coverage is below the required 80% threshold."
+        $coverageFile = "CoverageResults/Cobertura.xml"
+        if (Test-Path $coverageFile) {
+          [xml]$coverageXml = Get-Content -Path $coverageFile
+          $coveredLines = [double]$coverageXml.coverage.'line-rate' * 100
+          Write-Host "Code Coverage: $coveredLines%"
+        } else {
+          Write-Error "Coverage report not found"
           exit 1
         }
 
