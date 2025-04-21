@@ -39,19 +39,27 @@ jobs:
         $resultsDir = "TestResults"
         mkdir $resultsDir
         vstest.console.exe $testDll.FullName /Collect:"Code Coverage" /EnableCodeCoverage /Logger:trx /ResultsDirectory:$resultsDir
-        reportgenerator -reports:$resultsDir/*.trx -targetdir:. -reporttypes:Cobertura
+        reportgenerator -reports:$resultsDir/*.trx -targetdir:. -reporttypes:Cobertura;Html
         Rename-Item "Cobertura.xml" $coverageFile
+        Rename-Item "report-html" "CoverageReportHtml" # Rename the HTML report directory
+
     - name: Upload test report artifact
       uses: actions/upload-artifact@v4
       with:
         name: TestResults
         path: TestResults/*.trx
 
-    - name: Upload coverage report artifact
+    - name: Upload coverage report artifact (Cobertura)
       uses: actions/upload-artifact@v4
       with:
         name: CoverageReport
         path: Coverage.cobertura.xml
+
+    - name: Upload coverage report artifact (HTML)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CoverageReportHtml
+        path: CoverageReportHtml
 
     - name: Check code coverage
       run: |
@@ -81,9 +89,9 @@ jobs:
 
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v1
-  
+
     - name: Restore NuGet packages
-      run: nuget restore WindowsApp.sln      
+      run: nuget restore WindowsApp.sln
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
