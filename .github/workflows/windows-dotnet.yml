@@ -49,6 +49,11 @@ jobs:
           exit 1
         }
 
+    - name: Upload HTML coverage report artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: HTMLCoverageReport
+        path: CoverageReport/
 
     - name: Upload test report artifact
       uses: actions/upload-artifact@v4
