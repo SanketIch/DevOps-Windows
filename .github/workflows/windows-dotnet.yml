@@ -1,4 +1,4 @@
-name: .NET Build, Test and Coverage
+name: .NET Build, Test and Report
 
 on:
   push:
@@ -29,25 +29,54 @@ jobs:
     - name: Install VSTest Console
       uses: darenm/Setup-VSTest@v1
 
-    - name: Run unit tests and collect coverage
+    - name: Install ReportGenerator
+      run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+    - name: Run unit tests with code coverage
       run: |
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
         $resultsDir = "TestResults"
-        mkdir $resultsDir
-        vstest.console.exe $testDll.FullName /Collect:"Code Coverage" /Logger:trx /ResultsDirectory:$resultsDir
-        Write-Host "Test run complete. Coverage file collected."
+        $coverageDir = "CoverageResults"
+        mkdir $resultsDir -Force
+        mkdir $coverageDir -Force
+        
+        # Run tests with code coverage
+        vstest.console.exe $testDll.FullName `
+          /Logger:trx `
+          /ResultsDirectory:$resultsDir `
+          /EnableCodeCoverage `
+          /Settings:CodeCoverage.runsettings
+        
+        # Find the coverage file (it will be in a subfolder with GUID name)
+        $coverageFile = Get-ChildItem -Recurse -Filter "*.coverage" | Select-Object -First 1
+        
+        # Convert coverage file to cobertura format
+        reportgenerator `
+          -reports:"$($coverageFile.FullName)" `
+          -targetdir:$coverageDir `
+          -reporttypes:Cobertura
 
-    - name: Upload test result files
+    - name: Upload test report artifact
       uses: actions/upload-artifact@v4
       with:
         name: TestResults
         path: TestResults/*.trx
 
-    - name: Upload raw coverage files
+    - name: Upload coverage report artifact
       uses: actions/upload-artifact@v4
       with:
-        name: RawCoverageFiles
-        path: TestResults/**/*.coverage
+        name: CoverageReport
+        path: CoverageResults/Cobertura.xml
+
+    - name: Check code coverage
+      run: |
+        [xml]$coverageXml = Get-Content -Path "CoverageResults/Cobertura.xml"
+        $coveredLines = [double]$coverageXml.coverage.'line-rate' * 100
+        Write-Host "Code Coverage: $coveredLines%"
+        if ($coveredLines -lt 80) {
+          Write-Error "Code coverage is below the required 80% threshold."
+          exit 1
+        }
 
   codeql-analysis:
     name: CodeQL Analysis
