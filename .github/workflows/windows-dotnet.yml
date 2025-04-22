@@ -43,11 +43,11 @@ jobs:
         $resultsDir = "TestResults"
         mkdir $resultsDir
         # Run tests through OpenCover
-        .\OpenCover\OpenCover.Console.exe ` 
-          -target:"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" ` 
-          -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir" ` 
-          -output:"coverage.xml" ` 
-          -register:user
+        .\OpenCover\OpenCover.Console.exe `
+          "-target:C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" `
+          "-targetargs:`"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir`"" `
+          "-output:coverage.xml" `
+          "-register:user"
         # Generate only HTML report
         reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Html
 
