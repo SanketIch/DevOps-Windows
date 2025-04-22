@@ -49,9 +49,11 @@ jobs:
           -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir" `
           -output:"coverage.xml" `
           -register:user
+          -filter:"+[WindowsApp]*"  # Include WindowsApp assembly
+          -filter:"+[ConverterApp.Tests]*"  # Include ConverterApp.Tests assembly
 
         # Generate HTML report
-        reportgenerator -reports:"**\coverage.xml" -targetdir:"CoverageReport" -reporttypes:Html
+        reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Html
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
