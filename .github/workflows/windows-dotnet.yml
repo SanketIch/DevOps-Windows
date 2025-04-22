@@ -32,6 +32,9 @@ jobs:
     - name: Install ReportGenerator
       run: dotnet tool install --global dotnet-reportgenerator-globaltool
 
+    - name: Install trx2html (for converting .trx to HTML)
+      run: dotnet tool install --global trx2html
+
     - name: Download OpenCover
       run: |
         Invoke-WebRequest -Uri "https://github.com/OpenCover/opencover/releases/download/4.7.1221/OpenCover.4.7.1221.zip" -OutFile "OpenCover.zip"
@@ -49,8 +52,9 @@ jobs:
           -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir" `
           -output:"coverage.xml" `
           -register:user
-          -filter:"+[WindowsApp]*"  # Include WindowsApp assembly
-          -filter:"+[ConverterApp.Tests]*"  # Include ConverterApp.Tests assembly
+
+        # Generate HTML report for test results
+        trx2html -i $resultsDir\*.trx -o TestResultsHtml
 
         # Generate HTML report
         reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Html
@@ -60,6 +64,12 @@ jobs:
       with:
         name: TestResults
         path: TestResults/*.trx
+
+    - name: Upload HTML test report
+      uses: actions/upload-artifact@v4
+      with:
+        name: TestResultsHtml
+        path: TestResultsHtml/*
 
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
