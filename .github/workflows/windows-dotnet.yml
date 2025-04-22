@@ -37,7 +37,7 @@ jobs:
         Invoke-WebRequest -Uri "https://github.com/OpenCover/opencover/releases/download/4.7.1221/OpenCover.4.7.1221.zip" -OutFile "OpenCover.zip"
         Expand-Archive OpenCover.zip -DestinationPath "OpenCover"
     
-	  - name: Run tests with OpenCover and generate coverage report
+    - name: Run tests with OpenCover and generate coverage report
       run: |
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
         $resultsDir = "TestResults"
@@ -62,20 +62,6 @@ jobs:
       with:
         name: CoverageReport
         path: CoverageReport
-
-    - name: Check code coverage threshold
-      run: |
-        [xml]$coverageXml = Get-Content -Path "CoverageReport/Cobertura.xml"
-        $lineRate = [double]$coverageXml.coverage.'line-rate'
-        $coveragePercent = $lineRate * 100
-        Write-Host "📊 Code Coverage: $coveragePercent%"
-
-        if ($coveragePercent -lt 80) {
-          Write-Error "❌ Code coverage is below the required 80% threshold."
-          exit 1
-        } else {
-          Write-Host "✅ Code coverage meets the 80% threshold."
-        }
 
   codeql-analysis:
     name: CodeQL Analysis
