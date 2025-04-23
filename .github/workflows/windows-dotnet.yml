@@ -36,39 +36,46 @@ jobs:
       run: |
         Invoke-WebRequest -Uri "https://github.com/OpenCover/opencover/releases/download/4.7.1221/OpenCover.4.7.1221.zip" -OutFile "OpenCover.zip"
         Expand-Archive OpenCover.zip -DestinationPath "OpenCover"
+    
     - name: Run tests with OpenCover and generate coverage report
       run: |
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
         $resultsDir = "TestResults"
         mkdir $resultsDir
+    
         # Run tests through OpenCover
         .\OpenCover\OpenCover.Console.exe `
           -target:"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" `
           -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir" `
           -output:"coverage.xml" `
           -register:user
+    
+        # Generate Cobertura report
+        reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Cobertura
 
-    - name: Display code and branch coverage percentages
+    - name: Display code coverage
       run: |
         [xml]$coverage = Get-Content coverage.xml
-        $lineRate = $coverage.coverage.'line-rate'
-        $branchRate = $coverage.coverage.'branch-rate'
+        $package = $coverage.coverage.packages.package | Where-Object { $_.name -eq "ConverterApp.Tests" }
 
-        $linePercent = [math]::Round(([double]$lineRate) * 100, 2)
-        $branchPercent = [math]::Round(([double]$branchRate) * 100, 2)
+        if ($package) {
+          $lineRate = [double]$package.'line-rate'
 
-        Write-Host "Code Coverage (Line Rate): $linePercent%"
-        Write-Host "Branch Coverage (Branch Rate): $branchPercent%"
+          $linePercent = [math]::Round($lineRate * 100, 2)
 
-
+          Write-Host "Code Coverage : $linePercent%"
+        } else {
+          Write-Host "Package 'ConverterApp.Tests' not found in coverage report."
+        }
+    
     - name: Upload test results
       uses: actions/upload-artifact@v4
       with:
         name: TestResults
         path: TestResults/*.trx
-
+    
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
       with:
-        name: CoverageXML
-        path: coverage.xml
+        name: CoverageReport
+        path: CoverageReport/Cobertura.xml
