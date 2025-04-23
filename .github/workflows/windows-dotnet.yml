@@ -53,26 +53,36 @@ jobs:
         # Generate Cobertura report
         reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Cobertura
 
-    - name: Display code coverage
+    - name: Convert .trx to CSV
       run: |
-        [xml]$coverage = Get-Content coverage.xml
-        $package = $coverage.coverage.packages.package | Where-Object { $_.name -eq "ConverterApp.Tests" }
+        $trxPath = Get-ChildItem -Path TestResults -Filter *.trx | Select-Object -First 1
+        $xml = [xml](Get-Content $trxPath.FullName)
+        $csvPath = "TestResults/TestResults.csv"
 
-        if ($package) {
-          $lineRate = [double]$package.'line-rate'
-
-          $linePercent = [math]::Round($lineRate * 100, 2)
-
-          Write-Host "Code Coverage : $linePercent%"
-        } else {
-          Write-Host "Package 'ConverterApp.Tests' not found in coverage report."
+        $results = foreach ($unitTestResult in $xml.TestRun.Results.UnitTestResult) {
+          [PSCustomObject]@{
+            TestName  = $unitTestResult.testName
+            Outcome   = $unitTestResult.outcome
+            Duration  = $unitTestResult.duration
+            StartTime = $unitTestResult.startTime
+            EndTime   = $unitTestResult.endTime
+          }
         }
+
+        $results | Export-Csv -Path $csvPath -NoTypeInformation
+
     
     - name: Upload test results
       uses: actions/upload-artifact@v4
       with:
         name: TestResults
         path: TestResults/*.trx
+
+    - name: Upload CSV Test Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: TestResultsCSV
+        path: TestResults/TestResults.csv
     
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
