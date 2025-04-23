@@ -8,7 +8,7 @@ namespace CurrencyConverterApp.Tests
     public class ConverterTests
     {
         [TestMethod]
-        public void ConvertCurrency_ValidInput_ReturnsCorrectResult()
+        public void ValidInput_ReturnsCorrectResult()
         {
             var converter = new Converter();
             double result = converter.ConvertCurrency(100, 1.5);
@@ -17,7 +17,7 @@ namespace CurrencyConverterApp.Tests
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentException))]
-        public void ConvertCurrency_NegativeAmount_ThrowsException()
+        public void NegativeAmount_ThrowsException()
         {
             var converter = new Converter();
             converter.ConvertCurrency(-50, 1.5);
@@ -25,7 +25,7 @@ namespace CurrencyConverterApp.Tests
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentException))]
-        public void ConvertCurrency_ZeroRate_ThrowsException()
+        public void ZeroRate_ThrowsException()
         {
             var converter = new Converter();
             converter.ConvertCurrency(50, 0);
