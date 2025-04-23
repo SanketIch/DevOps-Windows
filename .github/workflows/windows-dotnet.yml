@@ -32,20 +32,15 @@ jobs:
     - name: Install ReportGenerator
       run: dotnet tool install --global dotnet-reportgenerator-globaltool
 
-    - name: Install trx2html (for converting .trx to HTML)
-      run: dotnet tool install --global trx2html
-
     - name: Download OpenCover
       run: |
         Invoke-WebRequest -Uri "https://github.com/OpenCover/opencover/releases/download/4.7.1221/OpenCover.4.7.1221.zip" -OutFile "OpenCover.zip"
         Expand-Archive OpenCover.zip -DestinationPath "OpenCover"
-
     - name: Run tests with OpenCover and generate coverage report
       run: |
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
         $resultsDir = "TestResults"
         mkdir $resultsDir
-
         # Run tests through OpenCover
         .\OpenCover\OpenCover.Console.exe `
           -target:"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" `
@@ -53,11 +48,18 @@ jobs:
           -output:"coverage.xml" `
           -register:user
 
-        # Generate HTML report for test results
-        trx2html -i $resultsDir\*.trx -o TestResultsHtml
+    - name: Display code and branch coverage percentages
+      run: |
+        [xml]$coverage = Get-Content coverage.xml
+        $lineRate = $coverage.coverage.'line-rate'
+        $branchRate = $coverage.coverage.'branch-rate'
 
-        # Generate HTML report
-        reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Html
+        $linePercent = [math]::Round(([double]$lineRate) * 100, 2)
+        $branchPercent = [math]::Round(([double]$branchRate) * 100, 2)
+
+        Write-Host "Code Coverage (Line Rate): $linePercent%"
+        Write-Host "Branch Coverage (Branch Rate): $branchPercent%"
+
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
@@ -65,14 +67,8 @@ jobs:
         name: TestResults
         path: TestResults/*.trx
 
-    - name: Upload HTML test report
-      uses: actions/upload-artifact@v4
-      with:
-        name: TestResultsHtml
-        path: TestResultsHtml/*
-
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
       with:
-        name: CoverageReport
-        path: CoverageReport
+        name: CoverageXML
+        path: coverage.xml
