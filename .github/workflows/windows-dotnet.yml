@@ -65,33 +65,25 @@ jobs:
         foreach ($unitTestResult in $xml.TestRun.Results.UnitTestResult) {
           $testId = $unitTestResult.testId
           $testDefinition = $xml.TestRun.TestDefinitions.UnitTest | Where-Object { $_.id -eq $testId }
-          
-          # Safely extract category names
-          $categoryItems = $testDefinition.TestMethod.TestCategory.TestCategoryItem
+
           $categories = @()
-          
-          if ($categoryItems) {
-              if ($categoryItems -is [System.Array]) {
-                  $categories = $categoryItems | ForEach-Object { $_.Name }
-              } else {
-                  $categories = @($categoryItems.Name)
-              }
+          if ($testDefinition.TestCategory.TestCategoryItem -is [System.Array]) {
+            $categories = @($testDefinition.TestCategory.TestCategoryItem | ForEach-Object { $_.TestCategory })
+          } elseif ($testDefinition.TestCategory.TestCategoryItem) {
+            $categories = @($testDefinition.TestCategory.TestCategoryItem.TestCategory)
           }
-          
-          # Determine if test is critical
+
           $isCritical = "Critical" -in $categories
 
-          # --- Debug Output ---
+          # Debug Output
           Write-Host "Test Case: $($unitTestResult.testName)"
           Write-Host "Categories: $($categories -join ', ')"
           Write-Host "IsCritical: $isCritical"
-          # --- End Debug Output ---
 
           if ($unitTestResult.outcome -eq "Failed" -and $isCritical) {
             Write-Host "❌ Critical test failed: $($unitTestResult.testName)"
             $criticalFailed = $true
           }
-
           $testResults += [PSCustomObject]@{
             TestCases  = $unitTestResult.testName
             Outcome    = $unitTestResult.outcome
@@ -101,9 +93,7 @@ jobs:
             Categories = ($categories -join ", ")
           }
         }
-
         $testResults | Export-Csv -Path $csvPath -NoTypeInformation
-
         if ($criticalFailed) {
           Write-Error "Critical test failure detected. Failing workflow."
           exit 1
