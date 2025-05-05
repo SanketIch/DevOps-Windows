@@ -61,6 +61,7 @@ jobs:
         $csvPath = "$resultsDir/TestResults.csv"
         $testResults = @()
         $criticalFailed = $false
+        $failedCriticalTests = @() # Array to store names of failed critical tests
 
         foreach ($unitTestResult in $xml.TestRun.Results.UnitTestResult) {
           $testId = $unitTestResult.testId
@@ -77,12 +78,12 @@ jobs:
 
           # Debug Output
           Write-Host "Test Case: $($unitTestResult.testName)"
-          Write-Host "Categories: $($categories -join ', ')"
           Write-Host "IsCritical: $isCritical"
 
           if ($unitTestResult.outcome -eq "Failed" -and $isCritical) {
             Write-Host "❌ Critical test failed: $($unitTestResult.testName)"
             $criticalFailed = $true
+            $failedCriticalTests += $unitTestResult.testName # Add the name to the array
           }
           $testResults += [PSCustomObject]@{
             TestCases  = $unitTestResult.testName
@@ -90,12 +91,13 @@ jobs:
             StartTime  = $unitTestResult.startTime
             EndTime    = $unitTestResult.endTime
             IsCritical = $isCritical
-            Categories = ($categories -join ", ")
           }
         }
         $testResults | Export-Csv -Path $csvPath -NoTypeInformation
+
         if ($criticalFailed) {
-          Write-Error "Critical test failure detected. Failing workflow."
+          $failedTestNames = $failedCriticalTests -join ", " # Join the names with a comma
+          Write-Error "Critical test failure(s) detected: $failedTestNames. Failing workflow."
           exit 1
         } else {
           Write-Host "✅ No critical test failures."
