@@ -53,54 +53,51 @@ jobs:
         # Generate Cobertura report
         reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Cobertura
 
-    - name: Check Critical Test Failures
+    - name: Check Critical Test Failures and Generate Detailed Report
       run: |
         $trxPath = Get-ChildItem -Path TestResults -Filter *.trx | Select-Object -First 1
         $xml = [xml](Get-Content $trxPath.FullName)
         $resultsDir = "TestResults"
         $csvPath = "$resultsDir/TestResults.csv"
+        $testResults = @()
         $criticalFailed = $false
-        $results = @()
-    
+
         foreach ($unitTestResult in $xml.TestRun.Results.UnitTestResult) {
-            $testId = $unitTestResult.testId
-            $testDefinition = $xml.TestRun.TestDefinitions.UnitTest | Where-Object { $_.id -eq $testId }
-    
-            # Safely extract categories
-            $categories = @()
-            if ($testDefinition.TestMethod.TestCategory -and $testDefinition.TestMethod.TestCategory.TestCategoryItem) {
-                $categories = $testDefinition.TestMethod.TestCategory.TestCategoryItem | ForEach-Object { $_.Name }
-            }
-    
-            $isCritical = $false
-            foreach ($category in $categories) {
-                if ($category -eq "Critical") {
-                    $isCritical = $true
-                    break
-                }
-            }
-    
-            if ($unitTestResult.outcome -ne "Passed" -and $isCritical) {
-                Write-Host "❌ Critical test failed: $($unitTestResult.testName)"
-                $criticalFailed = $true
-            }
-    
-            $results += [PSCustomObject]@{
-                TestCases  = $unitTestResult.testName
-                Outcome    = $unitTestResult.outcome
-                StartTime  = $unitTestResult.startTime
-                EndTime    = $unitTestResult.endTime
-                IsCritical = $isCritical
-            }
+          $testId = $unitTestResult.testId
+          $testDefinition = $xml.TestRun.TestDefinitions.UnitTest | Where-Object { $_.id -eq $testId }
+
+          # Ensure TestMethod and TestCategory exist before accessing Name
+          $categories = @()
+          if ($testDefinition.TestMethod.TestCategory -is [System.Array]) {
+            $categories = @($testDefinition.TestMethod.TestCategory | ForEach-Object {$_.TestCategoryItem.Name})
+          } elseif ($testDefinition.TestMethod.TestCategory.TestCategoryItem) {
+            $categories = @($testDefinition.TestMethod.TestCategory.TestCategoryItem.Name)
+          }
+
+          $isCritical = $categories -contains "Critical"
+
+          if ($unitTestResult.outcome -ne "Passed" -and $isCritical) {
+            Write-Host "❌ Critical test failed: $($unitTestResult.testName)"
+            $criticalFailed = $true
+          }
+
+          $testResults += [PSCustomObject]@{
+            TestCases  = $unitTestResult.testName
+            Outcome    = $unitTestResult.outcome
+            StartTime  = $unitTestResult.startTime
+            EndTime    = $unitTestResult.endTime
+            IsCritical = $isCritical
+            Categories = ($categories -join ", ")
+          }
         }
-    
-        $results | Export-Csv -Path $csvPath -NoTypeInformation
-    
+
+        $testResults | Export-Csv -Path $csvPath -NoTypeInformation
+
         if ($criticalFailed) {
-            Write-Error "Critical test failure detected. Failing workflow."
-            exit 1
+          Write-Error "Critical test failure detected. Failing workflow."
+          exit 1
         } else {
-            Write-Host "✅ No critical test failures."
+          Write-Host "✅ No critical test failures."
         }
 
     
