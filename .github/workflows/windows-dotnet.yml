@@ -42,14 +42,36 @@ jobs:
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
         $resultsDir = "TestResults"
         mkdir $resultsDir
-    
+
         # Run tests through OpenCover
+        .\OpenCover\OpenCover.Console.exe `
+          -target:"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" `
+          -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir /TestCaseFilter:Category=Critical" `
+          -output:"critical_coverage.xml" `
+          -register:user
+
+        # Check if any critical tests failed
+        $criticalTestResultsPath = Get-ChildItem -Path $resultsDir -Filter *.trx | Select-Object -First 1
+        if ($criticalTestResultsPath) {
+          $criticalTestXml = [xml](Get-Content $criticalTestResultsPath.FullName)
+          $failedCriticalTests = $criticalTestXml.TestRun.ResultSummary.Counters.failed
+          if ($failedCriticalTests -gt 0) {
+            Write-Error "Critical tests failed. Workflow will fail."
+            exit 1
+          } else {
+            Write-Host "All critical tests passed."
+          }
+        } else {
+          Write-Warning "No critical test results found."
+        }
+
+        # Run all tests for coverage (excluding filtering to get full coverage)
         .\OpenCover\OpenCover.Console.exe `
           -target:"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" `
           -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir" `
           -output:"coverage.xml" `
           -register:user
-    
+
         # Generate Cobertura report
         reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Cobertura
 
@@ -58,19 +80,16 @@ jobs:
         $trxPath = Get-ChildItem -Path TestResults -Filter *.trx | Select-Object -First 1
         $xml = [xml](Get-Content $trxPath.FullName)
         $csvPath = "TestResults/TestResults.csv"
-
         $results = foreach ($unitTestResult in $xml.TestRun.Results.UnitTestResult) {
           [PSCustomObject]@{
-            TestCases  = $unitTestResult.testName
-            Outcome   = $unitTestResult.outcome
+            TestCases   = $unitTestResult.testName
+            Outcome     = $unitTestResult.outcome
             StartTime = $unitTestResult.startTime
-            EndTime   = $unitTestResult.endTime
+            EndTime     = $unitTestResult.endTime
           }
         }
-
         $results | Export-Csv -Path $csvPath -NoTypeInformation
 
-    
     - name: Upload test results
       uses: actions/upload-artifact@v4
       with:
