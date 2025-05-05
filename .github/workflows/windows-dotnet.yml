@@ -81,6 +81,11 @@ jobs:
           # Determine if test is critical
           $isCritical = "Critical" -in $categories
 
+          # --- Debug Output ---
+          Write-Host "Test Case: $($unitTestResult.testName)"
+          Write-Host "Categories: $($categories -join ', ')"
+          Write-Host "IsCritical: $isCritical"
+          # --- End Debug Output ---
 
           if ($unitTestResult.outcome -eq "Failed" -and $isCritical) {
             Write-Host "❌ Critical test failed: $($unitTestResult.testName)"
