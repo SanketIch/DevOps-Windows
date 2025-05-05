@@ -43,55 +43,60 @@ jobs:
         $resultsDir = "TestResults"
         mkdir $resultsDir
 
-        # Run tests and collect coverage
-        .\OpenCover\OpenCover.Console.exe `
-          -target:"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" `
-          -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir /TestCaseFilter:Category=Critical" `
-          -output:"critical_coverage.xml" `
+        # Run tests through OpenCover
+        .\OpenCover\OpenCover.Console.exe ` 
+          -target:"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" ` 
+          -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir" ` 
+          -output:"coverage.xml" ` 
           -register:user
 
-        $criticalTestResultsPath = Get-ChildItem -Path $resultsDir -Filter "*.trx" | Select-Object -First 1
-        $criticalTestXml = [xml](Get-Content $criticalTestResultsPath.FullName)
+        # Generate Cobertura report
+        reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Cobertura
 
-        $criticalTestFailed = $false
-        foreach ($result in $criticalTestXml.TestRun.Results.UnitTestResult) {
-          if ($result.outcome -ne "Passed") {
-            Write-Host "Critical test '$($result.testName)' failed."
-            $criticalTestFailed = $true
-          }
-        }
-
-        if ($criticalTestFailed) {
-          Write-Error "One or more critical tests failed. Workflow will be marked as failed."
-          exit 1
-        } else {
-          Write-Host "All critical tests passed."
-        }
-
-        # Run other tests (excluding critical) and collect coverage
-        .\OpenCover\OpenCover.Console.exe `
-          -target:"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" `
-          -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir /TestCaseFilter:Category!=Critical" `
-          -output:"non_critical_coverage.xml" `
-          -register:user
-
-        # Generate Cobertura report (you might want to merge coverage reports for a complete picture)
-        reportgenerator -reports:"critical_coverage.xml;non_critical_coverage.xml" -targetdir:"CoverageReport" -reporttypes:Cobertura
-
-    - name: Convert .trx to CSV
+    - name: Check Critical Test Failures
       run: |
         $trxPath = Get-ChildItem -Path TestResults -Filter *.trx | Select-Object -First 1
         $xml = [xml](Get-Content $trxPath.FullName)
-        $csvPath = "TestResults/TestResults.csv"
-        $results = foreach ($unitTestResult in $xml.TestRun.Results.UnitTestResult) {
-          [PSCustomObject]@{
-            TestCases  = $unitTestResult.testName
-            Outcome    = $unitTestResult.outcome
-            StartTime = $unitTestResult.startTime
-            EndTime    = $unitTestResult.endTime
-          }
+        $resultsDir = "TestResults"
+        $csvPath = "$resultsDir/TestResults.csv"
+        $criticalFailed = $false
+        $results = @()
+
+        foreach ($unitTestResult in $xml.TestRun.Results.UnitTestResult) {
+            $testId = $unitTestResult.testId
+            $testDefinition = $xml.TestRun.TestDefinitions.UnitTest | Where-Object { $_.id -eq $testId }
+            $categories = $testDefinition.TestMethod.TestCategory.TestCategoryItem.Name
+
+            $isCritical = $false
+            foreach ($category in $categories) {
+                if ($category -eq "Critical") {
+                    $isCritical = $true
+                    break
+                }
+            }
+
+            if ($unitTestResult.outcome -ne "Passed" -and $isCritical) {
+                Write-Host "❌ Critical test failed: $($unitTestResult.testName)"
+                $criticalFailed = $true
+            }
+
+            $results += [PSCustomObject]@{
+                TestCases  = $unitTestResult.testName
+                Outcome    = $unitTestResult.outcome
+                StartTime  = $unitTestResult.startTime
+                EndTime    = $unitTestResult.endTime
+                IsCritical = $isCritical
+            }
         }
+
         $results | Export-Csv -Path $csvPath -NoTypeInformation
+
+        if ($criticalFailed) {
+            Write-Error "Critical test failure detected. Failing workflow."
+            exit 1
+        } else {
+            Write-Host "✅ No critical test failures."
+        }
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
@@ -104,9 +109,3 @@ jobs:
       with:
         name: TestResultsCSV
         path: TestResults/TestResults.csv
-
-    - name: Upload coverage report
-      uses: actions/upload-artifact@v4
-      with:
-        name: CoverageReport
-        path: CoverageReport/Cobertura.xml
