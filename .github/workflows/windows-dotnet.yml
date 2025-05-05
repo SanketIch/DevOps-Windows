@@ -65,18 +65,24 @@ jobs:
         foreach ($unitTestResult in $xml.TestRun.Results.UnitTestResult) {
           $testId = $unitTestResult.testId
           $testDefinition = $xml.TestRun.TestDefinitions.UnitTest | Where-Object { $_.id -eq $testId }
-
-          # Ensure TestMethod and TestCategory exist before accessing Name
+          
+          # Safely extract category names
+          $categoryItems = $testDefinition.TestMethod.TestCategory.TestCategoryItem
           $categories = @()
-          if ($testDefinition.TestMethod.TestCategory -is [System.Array]) {
-            $categories = @($testDefinition.TestMethod.TestCategory | ForEach-Object {$_.TestCategoryItem.Name})
-          } elseif ($testDefinition.TestMethod.TestCategory.TestCategoryItem) {
-            $categories = @($testDefinition.TestMethod.TestCategory.TestCategoryItem.Name)
+          
+          if ($categoryItems) {
+              if ($categoryItems -is [System.Array]) {
+                  $categories = $categoryItems | ForEach-Object { $_.Name }
+              } else {
+                  $categories = @($categoryItems.Name)
+              }
           }
+          
+          # Determine if test is critical
+          $isCritical = "Critical" -in $categories
 
-          $isCritical = $categories -eq "Critical"
 
-          if ($unitTestResult.outcome -eq "Failed") {
+          if ($unitTestResult.outcome -eq "Failed" -and $isCritical) {
             Write-Host "❌ Critical test failed: $($unitTestResult.testName)"
             $criticalFailed = $true
           }
