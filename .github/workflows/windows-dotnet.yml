@@ -74,9 +74,9 @@ jobs:
             $categories = @($testDefinition.TestMethod.TestCategory.TestCategoryItem.Name)
           }
 
-          $isCritical = $categories -contains "Critical"
+          $isCritical = $categories -eq "Critical"
 
-          if ($unitTestResult.outcome -eq "Failed" -and $isCritical) {
+          if ($unitTestResult.outcome -eq "Failed") {
             Write-Host "❌ Critical test failed: $($unitTestResult.testName)"
             $criticalFailed = $true
           }
