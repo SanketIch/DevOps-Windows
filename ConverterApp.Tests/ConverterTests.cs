@@ -8,6 +8,7 @@ namespace CurrencyConverterApp.Tests
     public class ConverterTests
     {
         [TestMethod]
+        [TestCategory("Critical")]
         public void ValidInput_ReturnsCorrectResult()
         {
             var converter = new Converter();
