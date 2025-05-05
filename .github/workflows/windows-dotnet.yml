@@ -36,20 +36,20 @@ jobs:
       run: |
         Invoke-WebRequest -Uri "https://github.com/OpenCover/opencover/releases/download/4.7.1221/OpenCover.4.7.1221.zip" -OutFile "OpenCover.zip"
         Expand-Archive OpenCover.zip -DestinationPath "OpenCover"
-
+    
     - name: Run tests with OpenCover and generate coverage report
       run: |
         $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
         $resultsDir = "TestResults"
         mkdir $resultsDir
-
+    
         # Run tests through OpenCover
-        .\OpenCover\OpenCover.Console.exe ` 
-          -target:"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" ` 
-          -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir" ` 
-          -output:"coverage.xml" ` 
+        .\OpenCover\OpenCover.Console.exe `
+          -target:"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" `
+          -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir" `
+          -output:"coverage.xml" `
           -register:user
-
+    
         # Generate Cobertura report
         reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Cobertura
 
@@ -61,12 +61,12 @@ jobs:
         $csvPath = "$resultsDir/TestResults.csv"
         $criticalFailed = $false
         $results = @()
-
+    
         foreach ($unitTestResult in $xml.TestRun.Results.UnitTestResult) {
             $testId = $unitTestResult.testId
             $testDefinition = $xml.TestRun.TestDefinitions.UnitTest | Where-Object { $_.id -eq $testId }
             $categories = $testDefinition.TestMethod.TestCategory.TestCategoryItem.Name
-
+    
             $isCritical = $false
             foreach ($category in $categories) {
                 if ($category -eq "Critical") {
@@ -74,12 +74,12 @@ jobs:
                     break
                 }
             }
-
+    
             if ($unitTestResult.outcome -ne "Passed" -and $isCritical) {
                 Write-Host "❌ Critical test failed: $($unitTestResult.testName)"
                 $criticalFailed = $true
             }
-
+    
             $results += [PSCustomObject]@{
                 TestCases  = $unitTestResult.testName
                 Outcome    = $unitTestResult.outcome
@@ -88,16 +88,16 @@ jobs:
                 IsCritical = $isCritical
             }
         }
-
+    
         $results | Export-Csv -Path $csvPath -NoTypeInformation
-
+    
         if ($criticalFailed) {
             Write-Error "Critical test failure detected. Failing workflow."
             exit 1
         } else {
             Write-Host "✅ No critical test failures."
         }
-
+    
     - name: Upload test results
       uses: actions/upload-artifact@v4
       with:
@@ -109,3 +109,9 @@ jobs:
       with:
         name: TestResultsCSV
         path: TestResults/TestResults.csv
+    
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: CoverageReport
+        path: CoverageReport/Cobertura.xml
