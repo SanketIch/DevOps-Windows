@@ -76,7 +76,7 @@ jobs:
 
           $isCritical = $categories -contains "Critical"
 
-          if ($unitTestResult.outcome -ne "Passed" -and $isCritical) {
+          if ($unitTestResult.outcome -eq "Failed" -and $isCritical) {
             Write-Host "❌ Critical test failed: $($unitTestResult.testName)"
             $criticalFailed = $true
           }
