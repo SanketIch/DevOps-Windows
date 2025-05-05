@@ -65,7 +65,12 @@ jobs:
         foreach ($unitTestResult in $xml.TestRun.Results.UnitTestResult) {
             $testId = $unitTestResult.testId
             $testDefinition = $xml.TestRun.TestDefinitions.UnitTest | Where-Object { $_.id -eq $testId }
-            $categories = $testDefinition.TestMethod.TestCategory.TestCategoryItem.Name
+    
+            # Safely extract categories
+            $categories = @()
+            if ($testDefinition.TestMethod.TestCategory -and $testDefinition.TestMethod.TestCategory.TestCategoryItem) {
+                $categories = $testDefinition.TestMethod.TestCategory.TestCategoryItem | ForEach-Object { $_.Name }
+            }
     
             $isCritical = $false
             foreach ($category in $categories) {
@@ -97,6 +102,7 @@ jobs:
         } else {
             Write-Host "✅ No critical test failures."
         }
+
     
     - name: Upload test results
       uses: actions/upload-artifact@v4
