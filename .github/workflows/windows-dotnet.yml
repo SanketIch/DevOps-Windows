@@ -21,10 +21,11 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore WindowsApp.sln
 
-      - name: Install Snyk CLI
-        uses: snyk/actions/setup@v2
-        with:
-          version: latest
+      - name: Install Snyk CLI (manual installation)
+        run: |
+          curl -sL https://github.com/snyk/snyk/releases/download/v1.515.0/snyk-win.zip -o snyk.zip
+          unzip snyk.zip -d snyk
+          mv snyk/snyk.exe $GITHUB_PATH
 
       - name: Authenticate with Snyk
         run: snyk auth ${{ secrets.SNYK_TOKEN }}
@@ -34,7 +35,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      - name: Monitor project in Snyk (optional - creates dashboard snapshot)
+      - name: Monitor project in Snyk (optional)
         run: snyk monitor --file=WindowsApp.sln --all-projects
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
