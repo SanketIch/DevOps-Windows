@@ -73,7 +73,8 @@ jobs:
       with:
         name: CoverageReport
         path: CoverageReport/Cobertura.xml
-		
+
+  
   snyk-analysis:
     name: Snyk Security Scan
     runs-on: ubuntu-latest
@@ -99,7 +100,8 @@ jobs:
         with:
           args: --all-projects --severity-threshold=medium # Adjust severity threshold as needed
           monitor: true # Automatically create a Snyk project and monitor for new vulnerabilities
-		
+
+  
   codeql-analysis:
     name: CodeQL Analysis
     runs-on: windows-latest
