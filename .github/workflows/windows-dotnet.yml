@@ -28,25 +28,24 @@ jobs:
 
     - name: Install VSTest Console
       uses: darenm/Setup-VSTest@v1
-
-
+		
   snyk-analysis:
     name: Snyk Security Scan
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: build # Ensure the build job completes before Snyk runs
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Recommended to get a full history for Snyk to detect vulnerabilities accurately
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x' # Or your project's .NET version
+          dotnet-version: '6.0.x' # project's .NET version
 
       - name: Restore NuGet packages
-        run: dotnet restore WindowsApp.sln # Or your solution file
+        run: dotnet restore WindowsApp.sln # solution file
 
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/dotnet@master
@@ -55,11 +54,10 @@ jobs:
         with:
           args: --all-projects --severity-threshold=medium # Adjust severity threshold as needed
           monitor: true # Automatically create a Snyk project and monitor for new vulnerabilities
-
+		
   codeql-analysis:
     name: CodeQL Analysis
     runs-on: windows-latest
-    needs: build # Ensure the build job completes before CodeQL runs
     permissions:
       actions: read
       contents: read
@@ -74,9 +72,9 @@ jobs:
 
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v1
-
+  
     - name: Restore NuGet packages
-      run: nuget restore WindowsApp.sln
+      run: nuget restore WindowsApp.sln      
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -87,4 +85,4 @@ jobs:
       run: msbuild WindowsApp.sln /p:Configuration=Release
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v3  
