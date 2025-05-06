@@ -28,7 +28,8 @@ jobs:
 
     - name: Install VSTest Console
       uses: darenm/Setup-VSTest@v1
-	
+
+ 
   snyk-analysis:
     name: Snyk Security Scan
     runs-on: windows-latest
