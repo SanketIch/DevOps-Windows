@@ -1,4 +1,4 @@
-name: Snyk Vulnerability Scan
+name: .NET Build, Test and Report
 
 on:
   push:
@@ -7,35 +7,76 @@ on:
     branches: [ master ]
 
 jobs:
-  snyk-scan:
-    name: Snyk Scan
+  build:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v1
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1
 
-      - name: Restore NuGet packages
-        run: nuget restore WindowsApp.sln
+    - name: Restore NuGet packages
+      run: nuget restore WindowsApp.sln
 
-      - name: Install Snyk CLI (manual installation)
-        run: |
-          curl -sL https://github.com/snyk/snyk/releases/download/v1.515.0/snyk-win.zip -o snyk.zip
-          unzip snyk.zip -d snyk
-          mv snyk/snyk.exe $GITHUB_PATH
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.3.1
 
-      - name: Authenticate with Snyk
-        run: snyk auth ${{ secrets.SNYK_TOKEN }}
+    - name: Build solution
+      run: msbuild WindowsApp.sln /p:Configuration=Release
 
-      - name: Run Snyk test (vulnerability scan)
-        run: snyk test --file=WindowsApp.sln --all-projects --severity-threshold=medium
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    - name: Install VSTest Console
+      uses: darenm/Setup-VSTest@v1
 
-      - name: Monitor project in Snyk (optional)
-        run: snyk monitor --file=WindowsApp.sln --all-projects
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.3.1
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1
+  
+    - name: Restore NuGet packages
+      run: nuget restore WindowsApp.sln      
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+
+    - name: Build code
+      run: msbuild WindowsApp.sln /p:Configuration=Release
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+
+  snyk-security:
+    name: Snyk Security Analysis
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Snyk
+      uses: snyk/actions/setup@v2
+
+    - name: Authenticate with Snyk
+      run: snyk auth ${{ secrets.SNYK_TOKEN }}
+
+    - name: Run Snyk test for vulnerabilities
+      run: snyk test --all-projects
+
+    - name: Monitor project with Snyk
+      run: snyk monitor --all-projects
