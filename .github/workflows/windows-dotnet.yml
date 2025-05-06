@@ -1,4 +1,4 @@
-name: .NET Build, Test and Report
+name: Snyk Vulnerability Scan
 
 on:
   push:
@@ -7,117 +7,34 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  snyk-scan:
+    name: Snyk Scan
     runs-on: windows-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup NuGet
-      uses: NuGet/setup-nuget@v1
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v1
 
-    - name: Restore NuGet packages
-      run: nuget restore WindowsApp.sln
+      - name: Restore NuGet packages
+        run: nuget restore WindowsApp.sln
 
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1.3.1
+      - name: Install Snyk CLI
+        uses: snyk/actions/setup@v2
+        with:
+          version: latest
 
-    - name: Build solution
-      run: msbuild WindowsApp.sln /p:Configuration=Release
+      - name: Authenticate with Snyk
+        run: snyk auth ${{ secrets.SNYK_TOKEN }}
 
-    - name: Install VSTest Console
-      uses: darenm/Setup-VSTest@v1
+      - name: Run Snyk test (vulnerability scan)
+        run: snyk test --file=WindowsApp.sln --all-projects --severity-threshold=medium
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-    - name: Install ReportGenerator
-      run: dotnet tool install --global dotnet-reportgenerator-globaltool
-
-    - name: Download OpenCover
-      run: |
-        Invoke-WebRequest -Uri "https://github.com/OpenCover/opencover/releases/download/4.7.1221/OpenCover.4.7.1221.zip" -OutFile "OpenCover.zip"
-        Expand-Archive OpenCover.zip -DestinationPath "OpenCover"
-    
-    - name: Run tests with OpenCover and generate coverage report
-      run: |
-        $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
-        $resultsDir = "TestResults"
-        mkdir $resultsDir
-    
-        # Run tests through OpenCover
-        .\OpenCover\OpenCover.Console.exe `
-          -target:"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" `
-          -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir" `
-          -output:"coverage.xml" `
-          -register:user
-    
-        # Generate Cobertura report
-        reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Cobertura
-
-    - name: Check Critical Test Failures and Generate Detailed Report
-      run: |
-        $trxPath = Get-ChildItem -Path TestResults -Filter *.trx | Select-Object -First 1
-        $xml = [xml](Get-Content $trxPath.FullName)
-        $resultsDir = "TestResults"
-        $csvPath = "$resultsDir/TestResults.csv"
-        $testResults = @()
-        $criticalFailed = $false
-        $failedCriticalTests = @() # Array to store names of failed critical tests
-
-        foreach ($unitTestResult in $xml.TestRun.Results.UnitTestResult) {
-          $testId = $unitTestResult.testId
-          $testDefinition = $xml.TestRun.TestDefinitions.UnitTest | Where-Object { $_.id -eq $testId }
-
-          $categories = @()
-          if ($testDefinition.TestCategory.TestCategoryItem -is [System.Array]) {
-            $categories = @($testDefinition.TestCategory.TestCategoryItem | ForEach-Object { $_.TestCategory })
-          } elseif ($testDefinition.TestCategory.TestCategoryItem) {
-            $categories = @($testDefinition.TestCategory.TestCategoryItem.TestCategory)
-          }
-
-          $isCritical = "Critical" -in $categories
-
-          # Debug Output
-          Write-Host "Test Case: $($unitTestResult.testName)"
-          Write-Host "IsCritical: $isCritical"
-
-          if ($unitTestResult.outcome -eq "Failed" -and $isCritical) {
-            Write-Host "❌ Critical test failed: $($unitTestResult.testName)"
-            $criticalFailed = $true
-            $failedCriticalTests += $unitTestResult.testName # Add the name to the array
-          }
-          $testResults += [PSCustomObject]@{
-            TestCases  = $unitTestResult.testName
-            Outcome    = $unitTestResult.outcome
-            StartTime  = $unitTestResult.startTime
-            EndTime    = $unitTestResult.endTime
-            IsCritical = $isCritical
-          }
-        }
-        $testResults | Export-Csv -Path $csvPath -NoTypeInformation
-
-        if ($criticalFailed) {
-          $failedTestNames = $failedCriticalTests -join ", " # Join the names with a comma
-          Write-Error "Critical test failure(s) detected: $failedTestNames. Failing workflow."
-          exit 1
-        } else {
-          Write-Host "✅ No critical test failures."
-        }
-
-    
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      with:
-        name: TestResults
-        path: TestResults/*.trx
-
-    - name: Upload CSV Test Results
-      uses: actions/upload-artifact@v4
-      with:
-        name: TestResultsCSV
-        path: TestResults/TestResults.csv
-    
-    - name: Upload coverage report
-      uses: actions/upload-artifact@v4
-      with:
-        name: CoverageReport
-        path: CoverageReport/Cobertura.xml
+      - name: Monitor project in Snyk (optional - creates dashboard snapshot)
+        run: snyk monitor --file=WindowsApp.sln --all-projects
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
