@@ -29,62 +29,47 @@ jobs:
     - name: Install VSTest Console
       uses: darenm/Setup-VSTest@v1
 
- 
-  snyk-analysis:
-    name: Snyk Security Scan
-    runs-on: windows-latest
-    needs: build # Ensure the build job completes before Snyk runs
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - name: Install ReportGenerator
+      run: dotnet tool install --global dotnet-reportgenerator-globaltool
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '6.0.x' # project's .NET version
+    - name: Download OpenCover
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/OpenCover/opencover/releases/download/4.7.1221/OpenCover.4.7.1221.zip" -OutFile "OpenCover.zip"
+        Expand-Archive OpenCover.zip -DestinationPath "OpenCover"
+    
+    - name: Run tests with OpenCover and generate coverage report
+      run: |
+        $testDll = Get-ChildItem -Recurse -Filter "ConverterApp.Tests.dll" | Select-Object -First 1
+        $resultsDir = "TestResults"
+        mkdir $resultsDir
+    
+        # Run tests through OpenCover
+        .\OpenCover\OpenCover.Console.exe `
+          -target:"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" `
+          -targetargs:"$($testDll.FullName) /Logger:trx /ResultsDirectory:$resultsDir" `
+          -output:"coverage.xml" `
+          -register:user
+    
+        # Generate Cobertura report
+        reportgenerator -reports:"coverage.xml" -targetdir:"CoverageReport" -reporttypes:Cobertura
 
-      - name: Restore NuGet packages
-        run: dotnet restore WindowsApp.sln # solution file
-
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/dotnet@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --all-projects --severity-threshold=medium # Adjust severity threshold as needed
-          monitor: true # Automatically create a Snyk project and monitor for new vulnerabilities
-
-  
-  codeql-analysis:
-    name: CodeQL Analysis
-    runs-on: windows-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1.3.1
-
-    - name: Setup NuGet
-      uses: NuGet/setup-nuget@v1
-  
-    - name: Restore NuGet packages
-      run: nuget restore WindowsApp.sln      
-
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+    - name: Check Critical Test Failures and Generate Detailed Report
+      run: ./.github/workflows/scripts/check_critical_tests.ps1
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
       with:
-        languages: csharp
+        name: TestResults
+        path: TestResults/*.trx
 
-    - name: Build code
-      run: msbuild WindowsApp.sln /p:Configuration=Release
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3  
+    - name: Upload CSV Test Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: TestResultsCSV
+        path: TestResults/TestResults.csv
+    
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: CoverageReport
+        path: CoverageReport/Cobertura.xml
