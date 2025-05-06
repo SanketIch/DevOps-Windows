@@ -73,3 +73,62 @@ jobs:
       with:
         name: CoverageReport
         path: CoverageReport/Cobertura.xml
+		
+  snyk-analysis:
+    name: Snyk Security Scan
+    runs-on: ubuntu-latest
+    needs: build # Ensure the build job completes before Snyk runs
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x' # project's .NET version
+
+      - name: Restore NuGet packages
+        run: dotnet restore WindowsApp.sln # solution file
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/dotnet@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --all-projects --severity-threshold=medium # Adjust severity threshold as needed
+          monitor: true # Automatically create a Snyk project and monitor for new vulnerabilities
+		
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: windows-latest
+    needs: build # Ensure the build job completes before CodeQL runs
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.3.1
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1
+  
+    - name: Restore NuGet packages
+      run: nuget restore WindowsApp.sln      
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+
+    - name: Build code
+      run: msbuild WindowsApp.sln /p:Configuration=Release
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3  
