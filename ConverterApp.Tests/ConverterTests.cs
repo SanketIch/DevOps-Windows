@@ -13,7 +13,7 @@ namespace CurrencyConverterApp.Tests
         {
             var converter = new Converter();
             double result = converter.ConvertCurrency(100, 1.5);
-            Assert.AreEqual(300.00, result);
+            Assert.AreEqual(150.00, result);
         }
 
         [TestMethod]
